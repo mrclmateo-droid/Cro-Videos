@@ -1,0 +1,69 @@
+name: reelforge
+
+x-backend: &backend
+  build: ../apps/api
+  env_file: .env
+  environment:
+    S3_ENDPOINT_PUBLIC: ${S3_ENDPOINT_PUBLIC:-http://localhost:9000}
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    minio: { condition: service_started }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reelforge
+      POSTGRES_PASSWORD: reelforge
+      POSTGRES_DB: reelforge
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reelforge"]
+      interval: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+
+  api:
+    <<: *backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports: ["8000:8000"]
+
+  web:
+    build: ../apps/web
+    environment:
+      # Vacío = el frontend deduce la URL de la API (localhost:8000 o el puerto 8000 de Codespaces).
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+  # Cola "media": FFmpeg + Whisper. Concurrencia 1 porque Whisper consume mucha CPU/RAM.
+  worker-media:
+    <<: *backend
+    command: celery -A workers.celery_app worker -Q media -c 1 -n media@%h --loglevel=INFO
+    volumes: [whisper_cache:/root/.cache/huggingface]
+
+  # Cola "llm": llamadas al LLM (I/O bound, se puede subir la concurrencia).
+  worker-llm:
+    <<: *backend
+    command: celery -A workers.celery_app worker -Q llm -c 2 -n llm@%h --loglevel=INFO
+
+volumes:
+  pgdata:
+  miniodata:
+  whisper_cache:
