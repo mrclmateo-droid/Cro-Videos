@@ -5,12 +5,33 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "hostRequirements": { "cpus": 4, "memory": "8gb" },
-  "forwardPorts": [3000, 8000, 9000, 9001],
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb"
+  },
+  "forwardPorts": [
+    3000,
+    8000,
+    9000,
+    9001
+  ],
   "portsAttributes": {
-    "3000": { "label": "App ReelForge" },
-    "8000": { "label": "API (Swagger en /docs)" },
-    "9000": { "label": "MinIO (descargas)" },
-    "9001": { "label": "MinIO consola" }
+    "3000": {
+      "label": "App ReelForge",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "API (Swagger en /docs)"
+    },
+    "9000": {
+      "label": "MinIO (descargas)"
+    },
+    "9001": {
+      "label": "MinIO consola"
+    }
+  },
+  "postStartCommand": "bash scripts/codespaces-up.sh > /tmp/codespaces-up.log 2>&1 || true",
+  "otherPortsAttributes": {
+    "onAutoForward": "silent"
   }
 }
