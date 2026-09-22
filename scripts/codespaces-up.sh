@@ -26,7 +26,7 @@ pull_with_retry() {
   return 1
 }
 
-for img in postgres:16-alpine redis:7-alpine minio/minio:latest; do
+for img in postgres:16-alpine redis:7-alpine quay.io/minio/minio:latest; do
   pull_with_retry "$img" || echo ">> Seguirá reintentando dentro de docker compose."
 done
 
